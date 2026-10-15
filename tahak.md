@@ -23,12 +23,11 @@
 * **Polopatě:** Velikost hřiště. Kolik máme hráčů a kolik mezi nimi vede šňůr.
 
 ### B. Hustota sítě (Density $\rho$)
-* **Vzorec:**  
-  $$\rho = \frac{2 \cdot |E|}{|V| \cdot (|V| - 1)}$$
-* **Naše hodnota:** $0.000677$ (cca $0.07\ \%$).
+* **Vzorec:** $\rho = \frac{2 \cdot |E|}{|V| \cdot (|V| - 1)}$
+* **Naše hodnota:** $0.000677$ (cca 0.07 %).
 * **Polopatě:** Kolik procent ze všech teoreticky možných propojení reálně existuje.
-  * Kdyby každá stránka lajkovala úplně každou, byla by hustota $1.0$ ($100\ \%$).
-  * Naše síť má hustotu $0.07\ \%$. To je typická **řídká síť (sparse network)**. V reálném světě nikdo nezná každého.
+  * Kdyby každá stránka lajkovala úplně každou, byla by hustota $1.0$ (100 %).
+  * Naše síť má hustotu 0.07 %. To je typická **řídká síť (sparse network)**. V reálném světě nikdo nezná každého.
 
 ### C. Stupeň vrcholu (Degree $k$)
 * **Co to je:** Počet přímých sousedů (kolik lajků daná stránka má).
@@ -46,8 +45,7 @@
 * **Polopatě:**
   * V normálním světě (např. výška lidí) máme Gaussovu křivku (většina lidí měří kolem 175 cm, nikdo nemá 5 metrů).
   * V komplexních sítích platí **pravidlo těžkého chvostu (Heavy-Tail)**: Drtivá většina uzlů má jen pár přátel, ale existuje pár monster (hubů), co jich mají tisíce.
-  * Když vyneseme pravděpodobnost $P(k)$ vůči stupni $k$ v **logaritmickém měřítku (Log-Log)**, vyjde klesající **přímka**. To značí mocninný zákon:
-    $$P(k) \sim k^{-\gamma}$$
+  * Když vyneseme pravděpodobnost $P(k)$ vůči stupni $k$ v **logaritmickém měřítku (Log-Log)**, vyjde klesající **přímka**. To značí mocninný zákon: $P(k) \sim k^{-\gamma}$.
   * Síť je tedy **bezškálová (Scale-Free)**.
 
 ---
@@ -55,7 +53,7 @@
 ## 2. Souvislost a vzdálenosti v síti
 
 ### A. Souvislé komponenty (Connected Components)
-* **Naše hodnota:** $1$ komponenta ($100\ \%$ sítě).
+* **Naše hodnota:** $1$ komponenta (100 % sítě).
 * **Polopatě:** Síť se nerozpadá na izolované ostrovy. Z libovolné stránky se po hranách dá doklikat na jakoukoliv jinou stránku v síti.
 
 ### B. Průměrná délka cesty (Average Path Length)
@@ -72,10 +70,9 @@
 ## 3. Shlukování (Clustering)
 
 ### A. Průměrný shlukovací koeficient (Clustering Coefficient $\langle CC \rangle$)
-* **Vzorec pro uzel $i$:**  
-  $$C_i = \frac{2 \cdot e_i}{k_i \cdot (k_i - 1)}$$  
+* **Vzorec pro uzel $i$:** $C_i = \frac{2 \cdot e_i}{k_i \cdot (k_i - 1)}$  
   *(kde $e_i$ je počet propojení mezi sousedy uzlu $i$, a jmenovatel je max možný počet propojení mezi nimi).*
-* **Naše hodnota:** $\langle CC \rangle = 0.3597$ (cca $36\ \%$).
+* **Naše hodnota:** $\langle CC \rangle = 0.3597$ (cca 36 %).
 * **Polopatě:** Otázka: *„Kamarádí se moji kamarádi mezi sebou?“*
   * V náhodném grafu by byl shlukovací koeficient roven hustotě sítě ($0.0006$).
   * U nás je $0.36$, což je **600× více než náhoda!** Lidé a instituce tvoří uzavřené party (trojúhelníky).
@@ -149,7 +146,7 @@ Centralita je číslo, které říká, jak moc je daný uzel důležitý. Existu
 
 ## 7. Rychlý návod: Jak to obhájit za 2 minuty u tabule
 1. *„Analyzovali jsme síť vzájemných sympatií mezi 22 470 ověřenými Facebook stránkami.“*
-2. *„Síť je typický bezškálový malý svět (Scale-Free Small-World): je velmi řídká ($0.07\ \%$), ale k jakékoliv stránce se dostanete v průměru na 5 kliknutí.“*
+2. *„Síť je typický bezškálový malý svět (Scale-Free Small-World): je velmi řídká (cca 0.07 %), ale k jakékoliv stránce se dostanete v průměru na 5 kliknutí.“*
 3. *„Stupně uzlů se řídí mocninným zákonem: většina stránek má pár kontaktů, zatímco huby jako U.S. Army nebo Bílý dům jich mají přes 600.“*
 4. *„V centralitě mezilehlosti (Betweenness) zcela dominuje stránka Facebooku a Barack Obama – fungují jako hlavní informační brány mezi odlišnými světy.“*
 5. *„Shlukovací efekt dokázal hierarchickou modularitu: lokální partičky mají vysoké CC, ale centrální huby spojují nesouvisející komunity.“*
