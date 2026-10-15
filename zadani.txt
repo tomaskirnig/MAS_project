@@ -1,0 +1,23 @@
+2. Úloha se bude skládat z dílčích kroků:
+a) Analýza základních strukturálních vlastností sítě vyjádřená buď tabulkou v případě
+globálních vlastností, grafem distribuce hodnot dané lokální vlastnosti a vizualizací.
+i. Počet vrcholů, hran, hustota.
+ii. Průměrný stupeň, maximální stupeň, distribuce stupňů.
+iii. Centrality.
+iv. Shlukovací koeficient CC – průměr. Dále graf pro tzv. shlukovací efekt.
+Shlukovací efekt se určí jako průměrný CC pro vrcholy daného stupně
+(distribuci průměrného CC (osa Y) vůči stupni (osa X)).
+v. Souvislost - počet souvislých komponent a distribuce jejich velikostí.
+vi. Vizualizace (včetně zvýraznění center/hubů).
+b) Analýza komunitní struktury (alespoň dva různé algoritmy).
+i. Počet komunit, průměrná, minimální a maximální velikost. Hodnota
+modularity.
+ii. Distribuce velikostí komunit.
+iii. Vizualizace podle komunitní struktury.
+3. Použité nástroje – Python, R, Gephi nebo/a jejich kombinace.
+4. Výstup bude ve formě textového dokumentu (pouze PDF!). Bude obsahovat popis datového
+souboru (kde a jak byl získán, co obsahuje atd.), výsledky analýzy a interpretaci výsledků (co
+znamenají).
+5. Deadline je 14.12.2026 do 23:59, předpokládaný termín prezentací výsledků analýzy po
+písemném testu. Pdf soubor odevzdáte v lms.csb.cz, Pdf soubor bude pojmenován „MAS1
+analýza váš_login.pdf“.
