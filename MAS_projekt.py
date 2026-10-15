@@ -425,24 +425,159 @@ def analyze_centralities(G: nx.Graph, df_target: pd.DataFrame, output_dir: str,
     }
 
 
+def relax_nodes(pos: Dict[Any, np.ndarray], min_dist: float = 0.11, 
+                iterations: int = 120, damping: float = 0.95) -> Dict[Any, np.ndarray]:
+    """
+    Vektorově optimalizovaná silová relaxace pro zamezení překryvu uzlů (anti-collision)
+    při současném zachování globální topologie a proporcí grafu.
+    """
+    nodes = list(pos.keys())
+    if len(nodes) <= 1:
+        return pos
+
+    coords = np.array([pos[n] for n in nodes], dtype=float)
+    n = len(nodes)
+    step = 0.2
+
+    for _ in range(iterations):
+        # Vzdálenosti mezi všemi dvojicemi uzlů (n x n)
+        diff = coords[:, np.newaxis, :] - coords[np.newaxis, :, :]
+        dists = np.hypot(diff[:, :, 0], diff[:, :, 1])
+        np.fill_diagonal(dists, 1e9)
+
+        mask = (dists < min_dist) & (dists > 1e-6)
+        if not np.any(mask):
+            break
+
+        forces = np.zeros_like(coords)
+        for i in range(n):
+            close_idx = np.where(mask[i])[0]
+            if len(close_idx) > 0:
+                d = dists[i, close_idx, np.newaxis]
+                dvec = diff[i, close_idx] / d
+                overlap = min_dist - d
+                forces[i] += np.sum(dvec * overlap, axis=0)
+
+        coords += forces * step
+        step *= damping
+
+    # Centrování a normalizace rozsahu
+    center = np.mean(coords, axis=0)
+    coords = coords - center
+    span = max(coords[:, 0].max() - coords[:, 0].min(), coords[:, 1].max() - coords[:, 1].min())
+    if span > 0:
+        coords = coords / (span / 2.0)
+
+    return {nodes[i]: coords[i] for i in range(n)}
+
+
+def smart_place_labels(ax: plt.Axes, pos: Dict[Any, np.ndarray], labels: Dict[Any, str], 
+                       fontsize: int = 8):
+    """
+    Inteligentní rozmístění popisků (labels) s detekcí kolizí a vodícími linkami:
+    Zabraňuje překrývání textových štítků navzájem i uzlů pod nimi.
+    """
+    if not labels:
+        return
+
+    label_items = list(labels.items())
+    label_nodes = [item[0] for item in label_items]
+    label_texts = [item[1] for item in label_items]
+
+    box_w = 0.26
+    box_h = 0.075
+
+    # Počáteční posun mírně směrem od těžiště
+    label_coords = []
+    for n in label_nodes:
+        x, y = pos[n]
+        norm = np.hypot(x, y)
+        if norm > 1e-4:
+            dx, dy = (x / norm) * 0.08, (y / norm) * 0.08
+        else:
+            dx, dy = 0.0, 0.08
+        label_coords.append([x + dx, y + dy])
+    label_coords = np.array(label_coords, dtype=float)
+
+    # Iterační odpuzování textových obdélníků (AABB collision resolution)
+    for _ in range(120):
+        moved = False
+        for i in range(len(label_coords)):
+            for j in range(i + 1, len(label_coords)):
+                dx = label_coords[i][0] - label_coords[j][0]
+                dy = label_coords[i][1] - label_coords[j][1]
+                overlap_x = (box_w * 0.95) - abs(dx)
+                overlap_y = (box_h * 0.95) - abs(dy)
+                if overlap_x > 0 and overlap_y > 0:
+                    moved = True
+                    if overlap_y / box_h < overlap_x / box_w:
+                        shift_y = 0.5 * overlap_y * (1 if dy >= 0 else -1)
+                        label_coords[i][1] += shift_y
+                        label_coords[j][1] -= shift_y
+                    else:
+                        shift_x = 0.5 * overlap_x * (1 if dx >= 0 else -1)
+                        label_coords[i][0] += shift_x
+                        label_coords[j][0] -= shift_x
+        if not moved:
+            break
+
+    # Vykreslení popisků a spojnic k uzlům
+    for i, n in enumerate(label_nodes):
+        nx_val, ny_val = pos[n]
+        lx, ly = label_coords[i]
+        dist = np.hypot(lx - nx_val, ly - ny_val)
+        arrowprops = dict(arrowstyle='-', color='#777777', lw=0.8, alpha=0.7) if dist > 0.07 else None
+
+        ax.annotate(
+            label_texts[i],
+            xy=(nx_val, ny_val),
+            xytext=(lx, ly),
+            ha='center', va='center',
+            fontsize=fontsize,
+            fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.25', facecolor='white', alpha=0.88, edgecolor='#aaaaaa', linewidth=0.8),
+            arrowprops=arrowprops,
+            zorder=10
+        )
+
+
+def compute_balanced_layout(subG: nx.Graph, min_dist: float = 0.11, 
+                           iterations: int = 120) -> Dict[Any, np.ndarray]:
+    """
+    Vypočítá vyvážený layout grafu s rovnoměrným rozložením uzlů (Kamada-Kawai)
+    a následnou fyzikální relaxací pro zamezení překryvu (anti-collision).
+    """
+    try:
+        pos = nx.kamada_kawai_layout(subG)
+    except Exception:
+        pos = nx.spring_layout(subG, k=0.55, iterations=150, seed=42)
+    return relax_nodes(pos, min_dist=min_dist, iterations=iterations)
+
+
 def visualize_network_hubs(G: nx.Graph, df_target: pd.DataFrame, 
                            centralities: Dict[str, Any], output_dir: str, 
-                           top_hubs_count: int = 70):
+                           top_hubs_count: int = 85):
     """
-    Vizualizuje jádro sítě tvořené nejvýznamnějšími huby (nejvyšší stupeň / PageRank).
+    Vizualizuje jádro sítě tvořené nejvýznamnějšími huby (nejvyšší PageRank / stupeň).
     Zvýrazní velikost podle stupně a barvu podle kategorie stránky (page_type).
-    Označí jménem největší centra/huby.
+    Používá vyvážený layout s prevencí překryvů a čitelné popisky.
     """
     print("\n" + "="*60)
     print(" 5. VIZUALIZACE SÍTĚ A ZVÝRAZNĚNÍ CENTER/HUBŮ")
     print("="*60)
 
-    # Výběr top N uzlů podle PageRanku / stupně pro reprezentativní podgraf jádra
+    # Výběr top N uzlů podle PageRanku pro reprezentativní podgraf jádra
     top_nodes = [node for node, pr in sorted(centralities['pagerank_cent'].items(), key=lambda x: x[1], reverse=True)[:top_hubs_count]]
     subG = G.subgraph(top_nodes).copy()
 
-    print(f"[*] Vytvářím rozložení (layout) pro podgraf {subG.number_of_nodes()} hlavních hubů s {subG.number_of_edges()} hranami...")
-    pos = nx.spring_layout(subG, k=0.35, iterations=80, seed=42)
+    # Odstranění izolovaných uzlů a zachování propojeného jádra
+    subG.remove_nodes_from(list(nx.isolates(subG)))
+    if not nx.is_connected(subG) and len(subG) > 0:
+        lcc = max(nx.connected_components(subG), key=len)
+        subG = subG.subgraph(lcc).copy()
+
+    print(f"[*] Vytvářím rozložení (layout) pro podgraf {subG.number_of_nodes()} propojených hubů s {subG.number_of_edges()} hranami...")
+    pos = compute_balanced_layout(subG, min_dist=0.11, iterations=120)
 
     # Barevné mapování podle kategorie
     color_map = {
@@ -458,7 +593,7 @@ def visualize_network_hubs(G: nx.Graph, df_target: pd.DataFrame,
         cat = df_target.loc[node, 'page_type'] if node in df_target.index else 'other'
         node_colors.append(color_map.get(cat, '#7f7f7f'))
         deg = G.degree(node)
-        node_sizes.append(max(60, min(1200, deg * 1.5)))
+        node_sizes.append(max(90, min(750, deg * 1.1)))
 
     fig, ax = plt.subplots(figsize=(15, 12))
 
@@ -466,18 +601,16 @@ def visualize_network_hubs(G: nx.Graph, df_target: pd.DataFrame,
     nx.draw_networkx_edges(subG, pos, ax=ax, alpha=0.18, edge_color='#555555', width=1.0)
 
     # Kreslení uzlů
-    nx.draw_networkx_nodes(subG, pos, ax=ax, node_color=node_colors, node_size=node_sizes, alpha=0.88, edgecolors='black', linewidths=1.2)
+    nx.draw_networkx_nodes(subG, pos, ax=ax, node_color=node_colors, node_size=node_sizes, alpha=0.9, edgecolors='black', linewidths=1.2)
 
-    # Popisky pro TOP 18 nejvýznamnějších stránek
-    top_labeled = sorted(top_nodes, key=lambda n: centralities['pagerank_cent'][n], reverse=True)[:18]
+    # Popisky pro TOP 18 nejvýznamnějších stránek s inteligentním rozmístěním bez překryvů
+    top_labeled = sorted(subG.nodes(), key=lambda n: centralities['pagerank_cent'].get(n, 0.0), reverse=True)[:18]
     labels = {}
     for n in top_labeled:
         name = df_target.loc[n, 'page_name'] if n in df_target.index else str(n)
-        # Zkrácení příliš dlouhých názvů
         labels[n] = name[:22] + "..." if len(name) > 25 else name
 
-    nx.draw_networkx_labels(subG, pos, labels=labels, ax=ax, font_size=8, font_weight='bold', font_color='black',
-                            bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.75, edgecolor="gray"))
+    smart_place_labels(ax, pos, labels, fontsize=8)
 
     # Legenda pro kategorie
     legend_elements = [
@@ -488,8 +621,9 @@ def visualize_network_hubs(G: nx.Graph, df_target: pd.DataFrame,
     ]
     ax.legend(handles=legend_elements, loc='upper left', frameon=True, fontsize=10)
 
-    ax.set_title(f"Jádrová struktura sítě - TOP {top_hubs_count} hubů a jejich vzájemné vazby\n(Velikost uzlu ~ Stupeň, Barva ~ Kategorie stránky)", fontsize=14)
+    ax.set_title(f"Jádrová struktura sítě - TOP {subG.number_of_nodes()} propojených hubů a jejich vazby\n(Velikost uzlu ~ Stupeň v síti, Barva ~ Kategorie stránky)", fontsize=14)
     ax.axis('off')
+    ax.margins(0.08)
 
     plt.tight_layout()
     chart_path = os.path.join(output_dir, "5_vizualizace_center_hubu.png")
@@ -581,34 +715,52 @@ def analyze_communities(G: nx.Graph, df_target: pd.DataFrame, output_dir: str) -
     print(f"[+] Graf distribuce komunit uložen do: {chart_path}")
 
     # Vizualizace komunitní struktury:
-    # 1. Podgraf jádra obarvený podle 6 největších Louvain komunit
+    # 1. Podgraf jádra obarvený podle Louvain komunit
     fig, ax = plt.subplots(figsize=(15, 12))
     
-    # Výběr 80 největších hubů pro přehlednost
+    # Výběr největších hubů pro přehlednost jádra a zachování souvislého grafu
     top_hubs = [node for node, deg in sorted(G.degree(), key=lambda x: x[1], reverse=True)[:85]]
     subG = G.subgraph(top_hubs).copy()
-    pos = nx.spring_layout(subG, k=0.35, iterations=80, seed=42)
+    subG.remove_nodes_from(list(nx.isolates(subG)))
+    if not nx.is_connected(subG) and len(subG) > 0:
+        lcc = max(nx.connected_components(subG), key=len)
+        subG = subG.subgraph(lcc).copy()
 
-    # Barvy pro top komunity
-    palette = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf']
-    comm_colors = []
-    for node in subG.nodes():
-        cid = node_to_louvain.get(node, 0)
-        comm_colors.append(palette[cid % len(palette)])
+    pos = compute_balanced_layout(subG, min_dist=0.11, iterations=120)
 
-    node_sizes = [max(80, min(1400, G.degree(n) * 1.6)) for n in subG.nodes()]
+    # Barvy pro top komunity bez kolizí palety (mapováno podle velikosti v podgrafu)
+    palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    unique_comms = sorted(
+        list(set(node_to_louvain.get(node, 0) for node in subG.nodes())),
+        key=lambda c: sum(1 for n in subG.nodes() if node_to_louvain.get(n, 0) == c),
+        reverse=True
+    )
+    comm_to_color = {cid: palette[i % len(palette)] for i, cid in enumerate(unique_comms)}
+    comm_colors = [comm_to_color[node_to_louvain.get(node, 0)] for node in subG.nodes()]
 
-    nx.draw_networkx_edges(subG, pos, ax=ax, alpha=0.2, edge_color='#666666')
+    node_sizes = [max(90, min(750, G.degree(n) * 1.1)) for n in subG.nodes()]
+
+    nx.draw_networkx_edges(subG, pos, ax=ax, alpha=0.18, edge_color='#666666', width=1.0)
     nx.draw_networkx_nodes(subG, pos, ax=ax, node_color=comm_colors, node_size=node_sizes, alpha=0.88, edgecolors='black', linewidths=1.2)
 
-    # Popisky pro top uzly
-    top_labeled = sorted(top_hubs, key=lambda n: G.degree(n), reverse=True)[:18]
-    labels = {n: (df_target.loc[n, 'page_name'][:20] if n in df_target.index else str(n)) for n in top_labeled}
-    nx.draw_networkx_labels(subG, pos, labels=labels, ax=ax, font_size=8, font_weight='bold',
-                            bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8, edgecolor="gray"))
+    # Popisky pro top uzly s inteligentním rozmístěním bez překryvů
+    top_labeled = sorted(subG.nodes(), key=lambda n: G.degree(n), reverse=True)[:18]
+    labels = {n: (df_target.loc[n, 'page_name'][:20] + '...' if len(df_target.loc[n, 'page_name']) > 22 else df_target.loc[n, 'page_name']) 
+              if n in df_target.index else str(n) for n in top_labeled}
+    smart_place_labels(ax, pos, labels, fontsize=8)
 
-    ax.set_title("Struktura komunit (Louvain) na jádru sítě\n(Různé barvy reprezentují různé Louvain komunity)", fontsize=14)
+    # Legenda pro komunity
+    legend_elements = [
+        plt.Line2D([0], [0], marker='o', color='w', 
+                   label=f'Komunita {cid} ({sum(1 for n in subG.nodes() if node_to_louvain.get(n, 0) == cid)} uzlů)',
+                   markerfacecolor=comm_to_color[cid], markersize=10)
+        for cid in unique_comms[:6]
+    ]
+    ax.legend(handles=legend_elements, loc='upper left', frameon=True, fontsize=10, title='Louvain komunity')
+
+    ax.set_title(f"Struktura komunit (Louvain) na jádru sítě ({subG.number_of_nodes()} největších hubů)\n(Barevně odlišeny jednotlivé Louvain komunity)", fontsize=14)
     ax.axis('off')
+    ax.margins(0.08)
 
     plt.tight_layout()
     chart_comm_path = os.path.join(output_dir, "7_vizualizace_komunit.png")
@@ -722,8 +874,8 @@ def generate_summary_report(stats_basic: Dict[str, Any],
 | **Odhad průměru sítě (Diameter)** | **{stats_conn['approx_diameter']}** | Maximální zjištěný počet kroků mezi uzly |
 
 ### Interpretace distribuce stupňů a shlukovacího efektu:
-1. **Distribuce stupňů (Degree Distribution):** Vykazuje těžký chvost (heavy-tail) s přibližným mocninným zákonem $P(k) \sim k^{{-\gamma}}$. Drtivá většina stránek má nízký stupeň, zatímco malé procento hubů má stovky až tisíce hran (bezškálová síť / Scale-Free).
-2. **Shlukovací efekt C(k):** Průměrný shlukovací koeficient klesá s rostoucím stupněm uzlu $C(k) \sim k^{{-\alpha}}$. To dokazuje **hierarchickou modularitu** sítě: malé uzly tvoří husté lokální klastry, zatímco velké huby propojují různé klastry navzájem a mají nižší lokální koeficient shlukování.
+1. **Distribuce stupňů (Degree Distribution):** Vykazuje těžký chvost (heavy-tail) s přibližným mocninným zákonem $P(k) \\sim k^{{-\\gamma}}$. Drtivá většina stránek má nízký stupeň, zatímco malé procento hubů má stovky až tisíce hran (bezškálová síť / Scale-Free).
+2. **Shlukovací efekt C(k):** Průměrný shlukovací koeficient klesá s rostoucím stupněm uzlu $C(k) \\sim k^{{-\\alpha}}$. To dokazuje **hierarchickou modularitu** sítě: malé uzly tvoří husté lokální klastry, zatímco velké huby propojují různé klastry navzájem a mají nižší lokální koeficient shlukování.
 
 ---
 
