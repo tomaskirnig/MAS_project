@@ -34,7 +34,7 @@
 
 ### Interpretace distribuce stupňů a shlukovacího efektu:
 1. **Distribuce stupňů (Degree Distribution):** Vykazuje těžký chvost (heavy-tail) s přibližným mocninným zákonem $P(k) \sim k^{-\gamma}$. Drtivá většina stránek má nízký stupeň, zatímco malé procento hubů má stovky až tisíce hran (bezškálová síť / Scale-Free).
-2. **Shlukovací efekt C(k):** Průměrný shlukovací koeficient klesá s rostoucím stupněm uzlu $C(k) \sim k^{-lpha}$. To dokazuje **hierarchickou modularitu** sítě: malé uzly tvoří husté lokální klastry, zatímco velké huby propojují různé klastry navzájem a mají nižší lokální koeficient shlukování.
+2. **Shlukovací efekt C(k):** Průměrný shlukovací koeficient klesá s rostoucím stupněm uzlu $C(k) \sim k^{-alpha}$. To dokazuje **hierarchickou modularitu** sítě: malé uzly tvoří husté lokální klastry, zatímco velké huby propojují různé klastry navzájem a mají nižší lokální koeficient shlukování.
 
 ---
 
