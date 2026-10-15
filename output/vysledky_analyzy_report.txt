@@ -1,7 +1,7 @@
 # Výsledky strukturální a komunitní analýzy sítě Facebook Large Page-Page Network
 **Předmět:** MAS1 (Modelování a simulace / Analýza sítí)  
 **Dataset:** Facebook Large Page-Page Webgraph (musae_facebook)  
-**Datum generování:** 15.10.2026 09:48:10
+**Datum generování:** 15.10.2026 13:49:02
 
 ---
 
